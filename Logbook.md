@@ -18,3 +18,16 @@ nth 32b:5+5+5+5+5+5+1+1 as plugboard letter 1&2 + plugboard letter 1&2, plugboar
 *I can include the rotors to encode the letter with only the rotor selection configuration option. Then check how much space this would take up and continue working on expanding it.*
 
 # 6/11/26
+I created a testbench to test the code I have written, to make sure that all the code is running properly. Testing out the rotors and the rotor configuration, checking the output and the individual flops that store the data. 
+Synthesised the design using librelane, and ran into some problems with this. Need to look at this further.
+
+# 11/11/26
+I fixed the issue, as it need some initialised values for some of the wires. After synthesis, I checked the area utilisation which was around 0.4. I did notice errors regarding slew, which doesn't seem to interferer with the programming and will fix this in the future.
+
+I implemented the reflector as a LUT and implemented this into the design, like the other rotors. For the rotor inverse, I coded in more LUTs as it makes visualising and coding easier, but will need to change this in the future to optimise for area. I updated the testbench to check that the rotors are moving through the system correctly and match the expected outputs.
+
+I spent a long time trying te design and and implement a system that increments the rotor by 1 after every key press, like the real enigma machine. As these are all using LUTs, I need to index the LUTs differently and include an offset with my binary encoded letter. I found that the equation 
+
+For short expresions and not so fancy math you could use the inline HTML to get your latex rendered math on codecogs and then embed the resulting image. Here an example:
+$$Index_{fwd}=(input+pos)$$
+- <img src="https://latex.codecogs.com/png.latex?Index_{inv}=(LUT(Index_{fwd})-pos)" />
