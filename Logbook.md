@@ -26,8 +26,6 @@ I fixed the issue, as it need some initialised values for some of the wires. Aft
 
 I implemented the reflector as a LUT and implemented this into the design, like the other rotors. For the rotor inverse, I coded in more LUTs as it makes visualising and coding easier, but will need to change this in the future to optimise for area. I updated the testbench to check that the rotors are moving through the system correctly and match the expected outputs.
 
-I spent a long time trying te design and and implement a system that increments the rotor by 1 after every key press, like the real enigma machine. As these are all using LUTs, I need to index the LUTs differently and include an offset with my binary encoded letter. I found that the equation 
-
-For short expresions and not so fancy math you could use the inline HTML to get your latex rendered math on codecogs and then embed the resulting image. Here an example:
+I spent a long time trying te design and and implement a system that increments the rotor by 1 after every key press, like the real enigma machine. As these are all using LUTs, I need to index the LUTs differently and include an offset with my binary encoded letter. I found that the equation (given below) allow this to work using the existing LUT method. I implemented this but am yet to check it.
 $$Index_{fwd}=(input+pos)$$
-- <img src="https://latex.codecogs.com/png.latex?Index_{inv}=(LUT(Index_{fwd})-pos)" />
+$$Index_{inv}=(LUT(Index_{fwd})-pos)$$
