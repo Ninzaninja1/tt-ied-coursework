@@ -29,3 +29,10 @@ I implemented the reflector as a LUT and implemented this into the design, like 
 I spent a long time trying te design and and implement a system that increments the rotor by 1 after every key press, like the real enigma machine. As these are all using LUTs, I need to index the LUTs differently and include an offset with my binary encoded letter. I found that the equation (given below) allow this to work using the existing LUT method. I implemented this but am yet to check it.
 $$Index_{fwd}=(input+pos)$$
 $$Index_{inv}=(LUT(Index_{fwd})-pos)$$
+
+# 14/11/26
+Implemented the equation from before, and updated the testbench to test that it worked. It worked in simulation. I fixed some other small bugs that I missed last time, with typos in the binary.
+
+I added a separate add and subtract function that rolls over back to 25, implemented the notch position rotating the second rotor and third rotor when needed, accounting for the double shift. Created a check to make sure the input is not over 26 as this would not work in the LUT.
+
+There is a space limitation now, which stops me synthesising the design. Optimisations need to be made to the tables to allow for placement. My first idea is to somehow reuse the LUTs for the inverse.
