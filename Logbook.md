@@ -36,3 +36,10 @@ Implemented the equation from before, and updated the testbench to test that it 
 I added a separate add and subtract function that rolls over back to 25, implemented the notch position rotating the second rotor and third rotor when needed, accounting for the double shift. Created a check to make sure the input is not over 26 as this would not work in the LUT.
 
 There is a space limitation now, which stops me synthesising the design. Optimisations need to be made to the tables to allow for placement. My first idea is to somehow reuse the LUTs for the inverse.
+
+Another error crept up when I tried to upload the design to github. The inputs ui_in and uio_in are both restricted to being 8 bits long, I will have to find a way to reduce this length.
+
+# 15/11/26
+I fixed the issue with the input being too long. I created a register that loads values into it over 3 clock cycles to write the configuration 3 times (total 24 bits: 15 bits for initial rotor position and 9 bits for rotor selection).
+
+The next optimisation was to reduce redundancy by removing the extra LUTs, the method I used to implement this is by iterating over the existing LUTs to look for the target letter and store the input. However, this implementation caused the system to expand even further from 103% to 127%. 
