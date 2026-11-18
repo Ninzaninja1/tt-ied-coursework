@@ -43,3 +43,9 @@ Another error crept up when I tried to upload the design to github. The inputs u
 I fixed the issue with the input being too long. I created a register that loads values into it over 3 clock cycles to write the configuration 3 times (total 24 bits: 15 bits for initial rotor position and 9 bits for rotor selection).
 
 The next optimisation was to reduce redundancy by removing the extra LUTs, the method I used to implement this is by iterating over the existing LUTs to look for the target letter and store the input. However, this implementation caused the system to expand even further from 103% to 127%. 
+
+# 16/11/26
+
+I have fixed the overutilisation issue with my design. After reading more about how functions work, I understood that the LUTs were rebuilt every time the function was called as I was not waiting for a clock signal. This also explains why when I removed the reverse LUTs and replaced it with a module that goes through each element in the LUT, it increased the area. To fix this, I implemented a clocked sequence that steps through each rotor using a clock which also allows for better clock distribution with a lower critical path time.
+
+This implementation was followed by an update to the testbench to allow for accurate checking with the new output clock timings. This now only uses 59% of the area as a significant improvement of 48%.
