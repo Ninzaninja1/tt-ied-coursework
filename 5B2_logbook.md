@@ -49,3 +49,10 @@ The next optimisation was to reduce redundancy by removing the extra LUTs, the m
 I have fixed the overutilisation issue with my design. After reading more about how functions work, I understood that the LUTs were rebuilt every time the function was called as I was not waiting for a clock signal. This also explains why when I removed the reverse LUTs and replaced it with a module that goes through each element in the LUT, it increased the area. To fix this, I implemented a clocked sequence that steps through each rotor using a clock which also allows for better clock distribution with a lower critical path time.
 
 This implementation was followed by an update to the testbench to allow for accurate checking with the new output clock timings. This now only uses 59% of the area as a significant improvement of 48%.
+
+# 23/11/26
+I am reworking the code to fix bugs and make it easier to read/edit. I have made a new header file .vh to store all the LUTs which will be used, but won't need to be changed as they are constant. I have fixed the issue of the stages starting on 1 rather 0. I have fixed the issue of the input being read multiple times and have implemented a read once block that checks parameters:
+-> `wire go = trig & ena & config_loaded & (state == IDLE);` this checks for (strobe rising edge, if its enabled, if config bytes are loaded, if its not currently encrypting)
+This helps prevent encryption before config is loaded, new characters being accepted before old ones are in progress, 
+
+The 2 states are IDLE and ROT where the state machine is either in IDLE where the values are stored in result or before any encryption, or with ROT where the values are being propagated through the rotors where the values are being encrypted through rotor1->rotor2->rotor3->reflector->inv_rotor3->inv_rotor2->inv_rotor1.
