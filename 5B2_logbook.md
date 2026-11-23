@@ -55,6 +55,8 @@ I am reworking the code to fix bugs and make it easier to read/edit. I have made
 -> `wire go = trig & ena & config_loaded & (state == IDLE);` this checks for (strobe rising edge, if its enabled, if config bytes are loaded, if its not currently encrypting)
 This helps prevent encryption before config is loaded, new characters being accepted before old ones are in progress, 
 
-The 2 states are IDLE and ROT where the state machine is either in IDLE where the values are stored in result or before any encryption, or with ROT where the values are being propagated through the rotors where the values are being encrypted through rotor1->rotor2->rotor3->reflector->inv_rotor3->inv_rotor2->inv_rotor1.
+The 2 states are IDLE and ROT where the state machine is either in IDLE where the values are stored in result or before any encryption, or with ROT where the values are being propagated through the rotors where the values are being encrypted through rotor1->rotor2->rotor3->reflector->inv_rotor3->inv_rotor2->inv_rotor1. 
+
+Both these changes reduced some redundancy and reduced my overall utilisation down to 54.7%.
 
 Expanded the testbench to run standardised tests for the enigma machine with different rotor initial conditions and rotor configurations. Inputting A and seeing the change in the letter and comparing this to the expected values. Testing values between rotor and final values. I also tested edge cases where the numbers roll over from A->Z or vice versa through modulo addation and subtraction, and testing the double notch step where the notch of rotor 1 and 2 are trigged making the rotor rotate twice.
