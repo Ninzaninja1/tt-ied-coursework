@@ -60,3 +60,6 @@ The 2 states are IDLE and ROT where the state machine is either in IDLE where th
 Both these changes reduced some redundancy and reduced my overall utilisation down to 54.7%.
 
 Expanded the testbench to run standardised tests for the enigma machine with different rotor initial conditions and rotor configurations. Inputting A and seeing the change in the letter and comparing this to the expected values. Testing values between rotor and final values. I also tested edge cases where the numbers roll over from A->Z or vice versa through modulo addation and subtraction, and testing the double notch step where the notch of rotor 1 and 2 are trigged making the rotor rotate twice.
+
+# 26/11/26
+I fixed the github issue, by instantiating the pins through the info.yaml file and the github process runs successfully.
