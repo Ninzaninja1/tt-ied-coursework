@@ -64,3 +64,5 @@ Expanded the testbench to run standardised tests for the enigma machine with dif
 # 26/11/26
 I fixed the github issue, by instantiating the pins through the info.yaml file and the github process runs successfully.
 Replaced rotor table to have forward and reverse in one case which creates less tables in the design. had to revert as this increased the slew errors and only reduced the utilisation by 1%
+
+To try and reduce the slew error, I am separating the rotor function into 2 sections, phase 1 is the address phase and look up phase, this should help with the clock timings as there are more buffered values.
