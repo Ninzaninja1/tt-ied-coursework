@@ -16,7 +16,7 @@
     function [4:0] I;
     input [4:0] lut_in;
     begin
-        case(in)
+        case(lut_in)
         //EKMFLGDQVZNTOWYHXUSPAIBRCJ
         // ROTOR 1
             5'd0  : I = 5'd4;  // a -> e
@@ -53,7 +53,7 @@
     function [4:0] II;
     input [4:0] lut_in;
     begin
-        case(in)
+        case(lut_in)
         //AJDKSIRUXBLHWTMCQGZNPYFVOE
         // ROTOR 2
             5'd0  : II = 5'd0;  // a -> a
@@ -90,7 +90,7 @@
     function [4:0] III;
     input [4:0] lut_in;
     begin
-        case(in)
+        case(lut_in)
         //BDFHJLCPRTXVZNYEIWGAKMUSQO
         // ROTOR 3
             5'd0  : III = 5'd1;  // a -> b
@@ -127,7 +127,7 @@
     function [4:0] IV;
     input [4:0] lut_in;
     begin
-        case(in)
+        case(lut_in)
         //ESOVPZJAYQUIRHXLNFTGKDCMWB
         // ROTOR 4
             5'd0  : IV = 5'd4;  // a -> e
@@ -164,7 +164,7 @@
     function [4:0] V;
     input [4:0] lut_in;
     begin
-        case(in)
+        case(lut_in)
         //VZBRGITYUPSDNHLXAWMJQOFECK
         // ROTOR 5
             5'd0  : V = 5'd21; // a -> v
@@ -202,7 +202,7 @@
     function [4:0] apply_reflector;
     input [4:0] lut_in;
     begin
-        case(in)
+        case(lut_in)
         //YRUHQSLDPXNGOKMIEBFZCWVJAT
         // REFLECTOR
             5'd0  : apply_reflector = 5'd24; // a -> y
@@ -241,7 +241,7 @@
 	function [4:0] I_inv;
 	input [4:0] lut_in;
 	begin
-		case (in)
+		case (lut_in)
 			5'd0  : I_inv = 5'd20;
 			5'd1  : I_inv = 5'd22;
 			5'd2  : I_inv = 5'd24;
@@ -276,7 +276,7 @@
 	function [4:0] II_inv;
 	input [4:0] lut_in;
 	begin
-		case (in)
+		case (lut_in)
 			5'd0  : II_inv = 5'd0;
 			5'd1  : II_inv = 5'd9;
 			5'd2  : II_inv = 5'd15;
@@ -311,7 +311,7 @@
 	function [4:0] III_inv;
 	input [4:0] lut_in;
 	begin
-		case (in)
+		case (lut_in)
 			5'd0  : III_inv = 5'd19;
 			5'd1  : III_inv = 5'd0;
 			5'd2  : III_inv = 5'd6;
@@ -346,7 +346,7 @@
 	function [4:0] IV_inv;
 	input [4:0] lut_in;
 	begin
-		case (in)
+		case (lut_in)
 			5'd0  : IV_inv = 5'd7;
 			5'd1  : IV_inv = 5'd25;
 			5'd2  : IV_inv = 5'd22;
@@ -381,7 +381,7 @@
 	function [4:0] V_inv;
 	input [4:0] lut_in;
 	begin
-		case (in)
+		case (lut_in)
 			5'd0  : V_inv = 5'd16;
 			5'd1  : V_inv = 5'd2;
 			5'd2  : V_inv = 5'd24;
@@ -420,11 +420,11 @@
         input [4:0] lut_in;
         begin
             case (sel)
-                3'b000: apply_rotor = I(in);
-                3'b001: apply_rotor = II(in);
-                3'b010: apply_rotor = III(in);
-                3'b011: apply_rotor = IV(in);
-                3'b100: apply_rotor = V(in);
+                3'b000: apply_rotor = I(lut_in);
+                3'b001: apply_rotor = II(lut_in);
+                3'b010: apply_rotor = III(lut_in);
+                3'b011: apply_rotor = IV(lut_in);
+                3'b100: apply_rotor = V(lut_in);
                 default: apply_rotor = lut_in;
             endcase
         end
