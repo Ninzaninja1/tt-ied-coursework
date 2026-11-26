@@ -14,7 +14,7 @@
 // --------------------- Forward rotor wirings ------------------------
 
     function [4:0] I;
-    input [4:0] in;
+    input [4:0] lut_in;
     begin
         case(in)
         //EKMFLGDQVZNTOWYHXUSPAIBRCJ
@@ -45,13 +45,13 @@
             5'd23 : I = 5'd17; // x -> r
             5'd24 : I = 5'd2;  // y -> c
             5'd25 : I = 5'd9;  // z -> j
-            default : I = in;
+            default : I = lut_in;
         endcase
     end
     endfunction
 
     function [4:0] II;
-    input [4:0] in;
+    input [4:0] lut_in;
     begin
         case(in)
         //AJDKSIRUXBLHWTMCQGZNPYFVOE
@@ -82,13 +82,13 @@
             5'd23 : II = 5'd21; // x -> v
             5'd24 : II = 5'd14; // y -> o
             5'd25 : II = 5'd4;  // z -> e
-            default : II = in;
+            default : II = lut_in;
         endcase
     end 
     endfunction
 
     function [4:0] III;
-    input [4:0] in;
+    input [4:0] lut_in;
     begin
         case(in)
         //BDFHJLCPRTXVZNYEIWGAKMUSQO
@@ -119,13 +119,13 @@
             5'd23 : III = 5'd18; // x -> s
             5'd24 : III = 5'd16; // y -> q
             5'd25 : III = 5'd14; // z -> o
-            default : III = in;
+            default : III = lut_in;
         endcase
     end
     endfunction
 
     function [4:0] IV;
-    input [4:0] in;
+    input [4:0] lut_in;
     begin
         case(in)
         //ESOVPZJAYQUIRHXLNFTGKDCMWB
@@ -156,13 +156,13 @@
             5'd23 : IV = 5'd12; // x -> m
             5'd24 : IV = 5'd22; // y -> w
             5'd25 : IV = 5'd1;  // z -> b
-            default : IV = in;
+            default : IV = lut_in;
         endcase
     end
     endfunction
 
     function [4:0] V;
-    input [4:0] in;
+    input [4:0] lut_in;
     begin
         case(in)
         //VZBRGITYUPSDNHLXAWMJQOFECK
@@ -193,14 +193,14 @@
             5'd23 : V = 5'd4;  // x -> e
             5'd24 : V = 5'd2;  // y -> c
             5'd25 : V = 5'd10; // z -> k
-            default : V = in;
+            default : V = lut_in;
         endcase
     end
     endfunction
 
 
     function [4:0] apply_reflector;
-    input [4:0] in;
+    input [4:0] lut_in;
     begin
         case(in)
         //YRUHQSLDPXNGOKMIEBFZCWVJAT
@@ -231,7 +231,7 @@
             5'd23 : apply_reflector = 5'd9;  // x -> j
             5'd24 : apply_reflector = 5'd0;  // y -> a
             5'd25 : apply_reflector = 5'd19; // z -> t
-            default : apply_reflector = in;
+            default : apply_reflector = lut_in;
         endcase
     end
     endfunction
@@ -239,7 +239,7 @@
 // --------------------- Inverse rotor wirings ------------------------
 
 	function [4:0] I_inv;
-	input [4:0] in;
+	input [4:0] lut_in;
 	begin
 		case (in)
 			5'd0  : I_inv = 5'd20;
@@ -268,13 +268,13 @@
 			5'd23 : I_inv = 5'd16;
 			5'd24 : I_inv = 5'd14;
 			5'd25 : I_inv = 5'd9;
-			default: I_inv = in;
+			default: I_inv = lut_in;
 		endcase
 	end
 	endfunction
 
 	function [4:0] II_inv;
-	input [4:0] in;
+	input [4:0] lut_in;
 	begin
 		case (in)
 			5'd0  : II_inv = 5'd0;
@@ -303,13 +303,13 @@
 			5'd23 : II_inv = 5'd8;
 			5'd24 : II_inv = 5'd21;
 			5'd25 : II_inv = 5'd18;
-			default: II_inv = in;
+			default: II_inv = lut_in;
 		endcase
 	end
 	endfunction
 
 	function [4:0] III_inv;
-	input [4:0] in;
+	input [4:0] lut_in;
 	begin
 		case (in)
 			5'd0  : III_inv = 5'd19;
@@ -338,13 +338,13 @@
 			5'd23 : III_inv = 5'd10;
 			5'd24 : III_inv = 5'd14;
 			5'd25 : III_inv = 5'd12;
-			default: III_inv = in;
+			default: III_inv = lut_in;
 		endcase
 	end
 	endfunction
 
 	function [4:0] IV_inv;
-	input [4:0] in;
+	input [4:0] lut_in;
 	begin
 		case (in)
 			5'd0  : IV_inv = 5'd7;
@@ -373,13 +373,13 @@
 			5'd23 : IV_inv = 5'd14;
 			5'd24 : IV_inv = 5'd8;
 			5'd25 : IV_inv = 5'd5;
-			default: IV_inv = in;
+			default: IV_inv = lut_in;
 		endcase
 	end
 	endfunction
 
 	function [4:0] V_inv;
-	input [4:0] in;
+	input [4:0] lut_in;
 	begin
 		case (in)
 			5'd0  : V_inv = 5'd16;
@@ -408,7 +408,7 @@
 			5'd23 : V_inv = 5'd15;
 			5'd24 : V_inv = 5'd7;
 			5'd25 : V_inv = 5'd1;
-			default: V_inv = in;
+			default: V_inv = lut_in;
 		endcase
 	end
 	endfunction
@@ -417,7 +417,7 @@
 
     function [4:0] apply_rotor;
         input [2:0] sel;
-        input [4:0] in;
+        input [4:0] lut_in;
         begin
             case (sel)
                 3'b000: apply_rotor = I(in);
@@ -425,7 +425,7 @@
                 3'b010: apply_rotor = III(in);
                 3'b011: apply_rotor = IV(in);
                 3'b100: apply_rotor = V(in);
-                default: apply_rotor = in;
+                default: apply_rotor = lut_in;
             endcase
         end
     endfunction

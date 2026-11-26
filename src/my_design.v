@@ -1,13 +1,22 @@
 // =============================================================================
-//  Configuration stream:
+//  Configuration stream (one byte per clock after reset is released):
 //    byte 0 = {slot3_sel[1:0], slot2_sel[2:0], slot1_sel[2:0]}
 //    byte 1 = {pos2[1:0], pos1[4:0], slot3_sel[2]}
 //    byte 2 = {pos3[4:0], pos2[4:2]}
+//    byte 3 = plug cable 1, letter A   (uio_in[4:0], upper 3 bits ignored)
+//    byte 4 = plug cable 1, letter B
+//    byte 5 = plug cable 2, letter A
+//    byte 6 = plug cable 2, letter B
 //
 //    config_reg = {pos3[4:0], pos2[4:0], pos1[4:0], slot3_sel[2:0], slot2_sel[2:0], slot1_sel[2:0]}
 //    [23:19] pos3 [18:14] pos2 [13:9] pos1 [8:6] slot3_sel [5:3] slot2_sel [2:0] slot1_sel
 //
 //  slot1 = right (fast) rotor
+//
+//  Plugboard: each cable swaps two letters (A<->B and B<->A), exactly like the
+//  Enigma Steckerbrett. Letters are 0-25 (A-Z). To leave a cable unused send
+//  any letter code >= 26 (e.g. 31) for either end of it. Cables must not share
+//  a letter (a real plugboard cannot connect one letter twice).
 // =============================================================================
 
 module tt_um_ninzaninja1_ied_coursework (
@@ -36,45 +45,51 @@ module tt_um_ninzaninja1_ied_coursework (
     wire letter_ok = (in < 5'd26);
 
     // ------------------------------------------------------------------
-    // Load config - 3 bytes
+    // Load config - 7 bytes (3 rotor bytes + 4 plugboard letters)
     // ------------------------------------------------------------------
     reg [23:0] config_reg;
-    reg [1:0] config_counter;
+    reg [4:0]  plug1_a, plug1_b; // plugboard cable 1 connects these two letters
+    reg [4:0]  plug2_a, plug2_b; // plugboard cable 2 connects these two letters
+    reg [2:0] config_counter;
     reg config_loaded;
     reg config_done;
 
     always @(posedge clk) begin
         if (!rst_n) begin // if reset then put everything to 0
-            config_counter <= 2'd0;
+            config_counter <= 3'd0;
             config_loaded <= 1'b0;
             config_done <= 1'b0;
         end else begin
             config_done <= 1'b0;
-			// load value from uio_in 3 times (counted by config_counter, and set config_done flag to true when its complete)
-            if (!config_loaded) begin 
-                // Count 0,1,2 to capture the three bytes, then use count 3 to
+            // load value from uio_in 7 times (counted by config_counter, and set config_done flag to true when its complete)
+            if (!config_loaded) begin
+                // Count 0..6 to capture the seven bytes, then use count 7 to
                 // raise config_done one cycle LATER so config_reg is fully written to before reading
-                if (config_counter == 2'd3) begin
+                if (config_counter == 3'd7) begin
                     config_loaded <= 1'b1;
                     config_done   <= 1'b1;
                 end else begin
-                    config_counter <= config_counter + 2'd1; //increment counter
+                    config_counter <= config_counter + 3'd1; //increment counter
                 end
             end
         end
     end
 
-    always @(posedge clk) begin // load config for 3 clk cycles
+    always @(posedge clk) begin // load config for 7 clk cycles
         if (rst_n && !config_loaded) begin
             case (config_counter)
-                2'd0: config_reg[7:0]   <= uio_in;
-                2'd1: config_reg[15:8]  <= uio_in;
-                2'd2: config_reg[23:16] <= uio_in;
+                3'd0: config_reg[7:0]   <= uio_in;
+                3'd1: config_reg[15:8]  <= uio_in;
+                3'd2: config_reg[23:16] <= uio_in;
+                3'd3: plug1_a <= uio_in[4:0];
+                3'd4: plug1_b <= uio_in[4:0];
+                3'd5: plug2_a <= uio_in[4:0];
+                3'd6: plug2_b <= uio_in[4:0];
                 default: ;
             endcase
         end
     end
-	// 000 = I ; 001 = II ; 010 = III ; 011 = IV ; 100 = V Rotor selection
+    // 000 = I ; 001 = II ; 010 = III ; 011 = IV ; 100 = V Rotor selection
     wire [2:0] slot1_sel = config_reg[2:0];
     wire [2:0] slot2_sel = config_reg[5:3];
     wire [2:0] slot3_sel = config_reg[8:6];
@@ -111,6 +126,42 @@ module tt_um_ninzaninja1_ied_coursework (
     endfunction
 
     // ------------------------------------------------------------------
+    // Plugboard (Steckerbrett)
+    //   One cable swaps two letters. Everything else passes straight through.
+    //   The same function is used on the way in and on the way out, because a
+    //   swap undoes itself.
+    // ------------------------------------------------------------------
+    function [4:0] swap_pair;
+        input [4:0] x; // letter going through the plugboard
+        input [4:0] a; // one end of the cable
+        input [4:0] b; // other end of the cable
+        begin
+            if (a >= 5'd26 || b >= 5'd26) // unused cable
+                swap_pair = x;
+            else if (x == a)
+                swap_pair = b;
+            else if (x == b)
+                swap_pair = a;
+            else
+                swap_pair = x;
+        end
+    endfunction
+
+    function [4:0] plugboard;
+        input [4:0] x;
+        input [4:0] p1a, p1b; // cable 1
+        input [4:0] p2a, p2b; // cable 2
+        reg   [4:0] y;
+        begin
+            y = swap_pair(x, p1a, p1b); // try cable 1
+            if (y != x)
+                plugboard = y;          // cable 1 matched
+            else
+                plugboard = swap_pair(x, p2a, p2b); // otherwise try cable 2
+        end
+    endfunction
+
+    // ------------------------------------------------------------------
     // LUTS
     // ------------------------------------------------------------------
     `include "rotor_luts.vh"
@@ -127,7 +178,7 @@ module tt_um_ninzaninja1_ied_coursework (
     localparam [1:0] IDLE = 2'd0, ROT  = 2'd1;
 
     reg [1:0] curr_segment; // 2'd0 forward, 2'd1 reflector, 2'd2 inverse
-    reg [2:0] curr_sel; // which rotor slot to use 
+    reg [2:0] curr_sel; // which rotor slot to use
     reg [4:0] curr_pos; // rotating after each letter
 
     always @(*) begin
@@ -206,6 +257,14 @@ module tt_um_ninzaninja1_ied_coursework (
     end
 
     // ------------------------------------------------------------------
+    // Plugboard at both ends of the machine
+    //   plug_in  : keyboard letter -> plugboard -> (loaded into mid, then rotors)
+    //   plug_out : last rotor output -> plugboard -> lamp (result)
+    // ------------------------------------------------------------------
+    wire [4:0] plug_in  = plugboard(in,        plug1_a, plug1_b, plug2_a, plug2_b);
+    wire [4:0] plug_out = plugboard(stage_out, plug1_a, plug1_b, plug2_a, plug2_b);
+
+    // ------------------------------------------------------------------
     // Rotor stepping
     // ------------------------------------------------------------------
     wire notch1 = (pos1 == notch_of(slot1_sel));
@@ -245,7 +304,7 @@ module tt_um_ninzaninja1_ied_coursework (
                 ROT: begin
                     if (cnt == 3'd6) begin
                         cnt    <= 3'd0;
-                        result <= stage_out;
+                        result <= plug_out; // was stage_out: now through the plugboard
                         valid  <= 1'b1;
                         state  <= IDLE;
                     end else begin
@@ -261,7 +320,7 @@ module tt_um_ninzaninja1_ied_coursework (
     end
 
     // ------------------------------------------------------------------
-    // Rotor positions 
+    // Rotor positions
     // ------------------------------------------------------------------
     always @(posedge clk) begin
         if (rst_n && config_done) begin // set initial positions
@@ -271,14 +330,14 @@ module tt_um_ninzaninja1_ied_coursework (
         end else if (rst_n && go && letter_ok) begin
             // Step first, then process the current character.
             pos1 <= pos1_inc;
-            if (notch1 | notch2) 
+            if (notch1 | notch2)
                 pos2 <= pos2_inc; // double step
-            if (notch2) 
+            if (notch2)
                 pos3 <= pos3_inc;
         end
 
         if (state == IDLE)
-            mid <= in;
+            mid <= plug_in; // was in: now through the plugboard
         else if (state == ROT)
             mid <= stage_out;
     end
@@ -291,7 +350,6 @@ module tt_um_ninzaninja1_ied_coursework (
     assign uio_out = 8'd0;
 
     // Unused inputs
-    wire _unused = &{1'b0, ui_in[6:5], 1'b0};
+    wire _unused = &{1'b0, ui_in[6:5], uio_in[7:5], 1'b0};
 
 endmodule
-   
