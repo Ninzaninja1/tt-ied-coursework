@@ -1,18 +1,13 @@
 // =============================================================================
-//  Configuration stream (one byte per clock):
+//  Configuration stream:
 //    byte 0 = {slot3_sel[1:0], slot2_sel[2:0], slot1_sel[2:0]}
 //    byte 1 = {pos2[1:0], pos1[4:0], slot3_sel[2]}
 //    byte 2 = {pos3[4:0], pos2[4:2]}
+//
 //    config_reg = {pos3[4:0], pos2[4:0], pos1[4:0], slot3_sel[2:0], slot2_sel[2:0], slot1_sel[2:0]}
 //    [23:19] pos3 [18:14] pos2 [13:9] pos1 [8:6] slot3_sel [5:3] slot2_sel [2:0] slot1_sel
 //
 //  slot1 = right (fast) rotor
-//
-//  Timing per character:
-//    E0 -> input registers
-//    E0+1 -> accept character and step rotors
-//    Next 7 cycles -> rotor/reflector stages
-//    VALID rises when result is written
 // =============================================================================
 
 module tt_um_ninzaninja1_ied_coursework (
@@ -22,9 +17,6 @@ module tt_um_ninzaninja1_ied_coursework (
     output wire [7:0] uo_out, uio_oe, uio_out
 );
 
-    // ------------------------------------------------------------------
-    // Input reg stage & rising edge detector
-    // ------------------------------------------------------------------
     reg [4:0] in;
     reg stb1, stb2;
 
@@ -44,7 +36,7 @@ module tt_um_ninzaninja1_ied_coursework (
     wire letter_ok = (in < 5'd26);
 
     // ------------------------------------------------------------------
-    // Serial configuration loader 3 bytes
+    // Load config - 3 bytes
     // ------------------------------------------------------------------
     reg [23:0] config_reg;
     reg [1:0] config_counter;
@@ -61,8 +53,7 @@ module tt_um_ninzaninja1_ied_coursework (
 			// load value from uio_in 3 times (counted by config_counter, and set config_done flag to true when its complete)
             if (!config_loaded) begin 
                 // Count 0,1,2 to capture the three bytes, then use count 3 to
-                // raise config_done one cycle LATER. That guarantees config_reg
-                // is fully written before the position loader samples it.
+                // raise config_done one cycle LATER so config_reg is fully written to before reading
                 if (config_counter == 2'd3) begin
                     config_loaded <= 1'b1;
                     config_done   <= 1'b1;
@@ -89,7 +80,7 @@ module tt_um_ninzaninja1_ied_coursework (
     wire [2:0] slot3_sel = config_reg[8:6];
 
     // ------------------------------------------------------------------
-    // Modulo add & sub (for maths btwn 0-25)
+    // Modulo add & sub (to cap letters between 0-25)
     // ------------------------------------------------------------------
     function [4:0] mod26_add;
         input [4:0] a;
@@ -135,66 +126,69 @@ module tt_um_ninzaninja1_ied_coursework (
 
     localparam [1:0] IDLE = 2'd0, ROT  = 2'd1;
 
-    reg [1:0] curr_mode;
-    reg [2:0] curr_sel;
+    reg [1:0] curr_segment; // 2'd0 forward, 2'd1 reflector, 2'd2 inverse
+    reg [2:0] curr_sel; // which rotor slot to use 
     reg [4:0] curr_pos; // rotating after each letter
 
     always @(*) begin
-        curr_mode = 2'd0;
+        curr_segment = 2'd0;
         curr_sel  = slot1_sel;
         curr_pos  = pos1;
 
         case (cnt) // select stage and params for that stage
             3'd0: begin
-                curr_mode = 2'd0;
+                curr_segment = 2'd0;
                 curr_sel  = slot1_sel;
                 curr_pos  = pos1;
             end
 
             3'd1: begin
-                curr_mode = 2'd0;
+                curr_segment = 2'd0;
                 curr_sel  = slot2_sel;
                 curr_pos  = pos2;
             end
 
             3'd2: begin
-                curr_mode = 2'd0;
+                curr_segment = 2'd0;
                 curr_sel  = slot3_sel;
                 curr_pos  = pos3;
             end
 
             3'd3: begin
-                curr_mode = 2'd1;
+                curr_segment = 2'd1;
                 curr_sel  = 3'b000;
                 curr_pos  = 5'd0;
             end
 
             3'd4: begin
-                curr_mode = 2'd2;
+                curr_segment = 2'd2;
                 curr_sel  = slot3_sel;
                 curr_pos  = pos3;
             end
 
             3'd5: begin
-                curr_mode = 2'd2;
+                curr_segment = 2'd2;
                 curr_sel  = slot2_sel;
                 curr_pos  = pos2;
             end
 
             3'd6: begin
-                curr_mode = 2'd2;
+                curr_segment = 2'd2;
                 curr_sel  = slot1_sel;
                 curr_pos  = pos1;
             end
 
             default: begin
-                curr_mode = 2'd0;
+                curr_segment = 2'd0;
                 curr_sel  = slot1_sel;
                 curr_pos  = pos1;
             end
         endcase
     end
 
+    // ------------------------------------------------------------------
+    // Rotor datapath (one stage per clock)
+    // ------------------------------------------------------------------
     wire [4:0] shifted  = mod26_add(mid, curr_pos);
     wire [4:0] fwd_out  = apply_rotor(curr_sel, shifted);
     wire [4:0] inv_out  = apply_rotor_inv(curr_sel, shifted);
@@ -203,7 +197,7 @@ module tt_um_ninzaninja1_ied_coursework (
     reg [4:0] stage_out;
 
     always @(*) begin
-        case (curr_mode) // creates 2 mod26_sub muxes
+        case (curr_segment) // 2'd1 = reflector, 2'd2 = inverse rotor, 2'd0 = forward rotor.
             2'd0: stage_out = mod26_sub(fwd_out, curr_pos);
             2'd1: stage_out = refl_out;
             2'd2: stage_out = mod26_sub(inv_out, curr_pos);
@@ -222,7 +216,7 @@ module tt_um_ninzaninja1_ied_coursework (
     wire [4:0] pos3_inc = (pos3 == 5'd25) ? 5'd0 : pos3 + 5'd1;
 
     // ------------------------------------------------------------------
-    // single read correrction
+    // Single read correrction
     // ------------------------------------------------------------------
     wire go = trig & ena & config_loaded & (state == IDLE);
 
@@ -300,4 +294,4 @@ module tt_um_ninzaninja1_ied_coursework (
     wire _unused = &{1'b0, ui_in[6:5], 1'b0};
 
 endmodule
-    
+   
