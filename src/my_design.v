@@ -84,18 +84,25 @@ module tt_um_ninzaninja1_ied_coursework (
                 3'd0: config_reg[7:0]   <= uio_in;
                 3'd1: config_reg[15:8]  <= uio_in;
                 3'd2: config_reg[23:16] <= uio_in;
-                3'd3: plug1_a <= (uio_in[4:0] < 5'd26) ? uio_in[4:0] : 5'd0;
-                3'd4: plug1_b <= (uio_in[4:0] < 5'd26) ? uio_in[4:0] : 5'd0;
-                3'd5: plug2_a <= (uio_in[4:0] < 5'd26) ? uio_in[4:0] : 5'd0;
-                3'd6: plug2_b <= (uio_in[4:0] < 5'd26) ? uio_in[4:0] : 5'd0;
+                // Store the raw 5-bit code, do NOT clamp to 0. swap_pair()
+                // disables a cable when either end is >= 26, so an"unused"
+                // code must stay >= 26. Clamping it to letter A would turn a
+                // half-unused cable (e.g. {31, D}) into a live A-D swap.
+                3'd3: plug1_a <= uio_in[4:0];
+                3'd4: plug1_b <= uio_in[4:0];
+                3'd5: plug2_a <= uio_in[4:0];
+                3'd6: plug2_b <= uio_in[4:0];
                 default: ;
             endcase
         end
     end
     // 000 = I ; 001 = II ; 010 = III ; 011 = IV ; 100 = V Rotor selection
-    wire [2:0] slot1_sel = (config_reg[2:0] < 3'd5) ? config_reg[2:0] : 5'd0;
-    wire [2:0] slot2_sel = (config_reg[5:3] < 3'd5) ? config_reg[5:3] : 5'd0;
-    wire [2:0] slot3_sel = (config_reg[8:6] < 3'd5) ? config_reg[8:6] : 5'd0;
+    // Only selects 0..4 name a real rotor. Selects 5, 6 and 7 are invalid
+    // and must fall back to rotor I (select 0), never reach the identity
+    // default in apply_rotor/apply_rotor_inv/notch_of.
+    wire [2:0] slot1_sel = (config_reg[2:0] < 3'd5) ? config_reg[2:0] : 3'd0;
+    wire [2:0] slot2_sel = (config_reg[5:3] < 3'd5) ? config_reg[5:3] : 3'd0;
+    wire [2:0] slot3_sel = (config_reg[8:6] < 3'd5) ? config_reg[8:6] : 3'd0;
 
     // ------------------------------------------------------------------
     // Modulo add & sub (to cap letters between 0-25)
