@@ -66,3 +66,10 @@ I fixed the github issue, by instantiating the pins through the info.yaml file a
 Replaced rotor table to have forward and reverse in one case which creates less tables in the design. had to revert as this increased the slew errors and only reduced the utilisation by 1%
 
 To try and reduce the slew error, I am separating the rotor function into 2 sections, phase 1 is the address phase and look up phase, this should help with the clock timings as there are more buffered values. Tried multiple iterations of configuration with different buffers and settings, which ran me over the compute limit for the week. Will spend more time making the testbench check more throughly.
+
+# 27/11/26
+I migrated to using iverilog and github.
+
+I created points that I wanted checked in the testbench and rewrote the entire testbench to check based on the parameters mentioned in the testbench.
+
+As I am not able to check every configuration and input as this is simply too long, I will divide checking into blocks. To check the LUTS are correct I can implement this check $$R^{-1}(R(x)) = x$$ and similarly with the plugboard values $$P(P(x))= x$$, check values for the 
