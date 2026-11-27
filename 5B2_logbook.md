@@ -72,4 +72,4 @@ I migrated to using iverilog and github.
 
 I created points that I wanted checked in the testbench and rewrote the entire testbench to check based on the parameters mentioned in the testbench.
 
-As I am not able to check every configuration and input as this is simply too long, I will divide checking into blocks. To check the LUTS are correct I can implement this check $$R^{-1}(R(x)) = x$$ and similarly with the plugboard values $$P(P(x))= x$$, check values for the 
+As I am not able to check every configuration and input as this is simply too long, I will divide checking into blocks. To check the LUTS are correct I can implement this check $$R^{-1}(R(x)) = x$$ and similarly with the plugboard values $$P(P(x))= x$$ 
