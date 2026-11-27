@@ -13,10 +13,7 @@
 //
 //  slot1 = right (fast) rotor
 //
-//  Plugboard: each cable swaps two letters (A<->B and B<->A), exactly like the
-//  Enigma Steckerbrett. Letters are 0-25 (A-Z). To leave a cable unused send
-//  any letter code >= 26 (e.g. 31) for either end of it. Cables must not share
-//  a letter (a real plugboard cannot connect one letter twice).
+//  Plugboard: each cable swaps two letters (A<->B and B<->A)
 // =============================================================================
 
 module tt_um_ninzaninja1_ied_coursework (
