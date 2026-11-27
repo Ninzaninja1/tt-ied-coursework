@@ -50,6 +50,9 @@ module tt_um_ninzaninja1_ied_coursework (
     reg [23:0] config_reg;
     reg [4:0]  plug1_a, plug1_b; // plugboard cable 1 connects these two letters
     reg [4:0]  plug2_a, plug2_b; // plugboard cable 2 connects these two letters
+
+    // TODO: how to check and reject case for when A->B plug 1 and B-> C plug 2 
+
     reg [2:0] config_counter;
     reg config_loaded;
     reg config_done;
@@ -81,18 +84,18 @@ module tt_um_ninzaninja1_ied_coursework (
                 3'd0: config_reg[7:0]   <= uio_in;
                 3'd1: config_reg[15:8]  <= uio_in;
                 3'd2: config_reg[23:16] <= uio_in;
-                3'd3: plug1_a <= uio_in[4:0];
-                3'd4: plug1_b <= uio_in[4:0];
-                3'd5: plug2_a <= uio_in[4:0];
-                3'd6: plug2_b <= uio_in[4:0];
+                3'd3: plug1_a <= (uio_in[4:0] < 5'd26) ? uio_in[4:0] : 5'd0;
+                3'd4: plug1_b <= (uio_in[4:0] < 5'd26) ? uio_in[4:0] : 5'd0;
+                3'd5: plug2_a <= (uio_in[4:0] < 5'd26) ? uio_in[4:0] : 5'd0;
+                3'd6: plug2_b <= (uio_in[4:0] < 5'd26) ? uio_in[4:0] : 5'd0;
                 default: ;
             endcase
         end
     end
     // 000 = I ; 001 = II ; 010 = III ; 011 = IV ; 100 = V Rotor selection
-    wire [2:0] slot1_sel = config_reg[2:0];
-    wire [2:0] slot2_sel = config_reg[5:3];
-    wire [2:0] slot3_sel = config_reg[8:6];
+    wire [2:0] slot1_sel = (config_reg[2:0] < 3'd5) ? config_reg[2:0] : 5'd0;
+    wire [2:0] slot2_sel = (config_reg[5:3] < 3'd5) ? config_reg[5:3] : 5'd0;
+    wire [2:0] slot3_sel = (config_reg[8:6] < 3'd5) ? config_reg[8:6] : 5'd0;
 
     // ------------------------------------------------------------------
     // Modulo add & sub (to cap letters between 0-25)
@@ -126,10 +129,7 @@ module tt_um_ninzaninja1_ied_coursework (
     endfunction
 
     // ------------------------------------------------------------------
-    // Plugboard (Steckerbrett)
-    //   One cable swaps two letters. Everything else passes straight through.
-    //   The same function is used on the way in and on the way out, because a
-    //   swap undoes itself.
+    // Plugboard
     // ------------------------------------------------------------------
     function [4:0] swap_pair;
         input [4:0] x; // letter going through the plugboard
@@ -256,11 +256,7 @@ module tt_um_ninzaninja1_ied_coursework (
         endcase
     end
 
-    // ------------------------------------------------------------------
-    // Plugboard at both ends of the machine
-    //   plug_in  : keyboard letter -> plugboard -> (loaded into mid, then rotors)
-    //   plug_out : last rotor output -> plugboard -> lamp (result)
-    // ------------------------------------------------------------------
+    // plugboard is at both ends of the machine
     wire [4:0] plug_in  = plugboard(in,        plug1_a, plug1_b, plug2_a, plug2_b);
     wire [4:0] plug_out = plugboard(stage_out, plug1_a, plug1_b, plug2_a, plug2_b);
 
