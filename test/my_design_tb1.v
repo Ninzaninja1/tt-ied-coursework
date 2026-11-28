@@ -49,9 +49,9 @@ module tb_enigma;
 
     localparam integer LATENCY_ENCRYPT_CYCLES  = 8;  // E0 -> result visible, letters 0..25
     localparam integer LATENCY_ECHO_CYCLES     = 1;  // E0 -> result visible, letters 26..31
-    localparam integer CONFIG_BYTE_COUNT       = 7;  // bytes sampled at R0..R6
-    localparam integer CONFIG_FIRST_STROBE_EDGE= 8;  // earliest R-index for E0 of an ACCEPTED request
-    localparam integer CONFIG_FIRST_GO_EDGE    = 9;  // = CONFIG_FIRST_STROBE_EDGE + 1  (E1)
+    localparam integer CONFIG_BYTE_COUNT       = 23;  // bytes sampled at R0..R6
+    localparam integer CONFIG_FIRST_STROBE_EDGE= 24;  // earliest R-index for E0 of an ACCEPTED request
+    localparam integer CONFIG_FIRST_GO_EDGE    = 25;  // = CONFIG_FIRST_STROBE_EDGE + 1  (E1)
     localparam integer MIN_ACCEPTED_SPACING    = 8;  // E0 -> next accepted E0 for a valid letter
     localparam integer RESPONSE_TIMEOUT_CYCLES = 16;
 
@@ -137,11 +137,11 @@ module tb_enigma;
     integer ref_plug_map  [0:25];
     integer ref_rotor_slot1, ref_rotor_slot2, ref_rotor_slot3;   // slot1 = right/fast rotor
     integer ref_pos1, ref_pos2, ref_pos3;
-    integer ref_cable1_a, ref_cable1_b, ref_cable2_a, ref_cable2_b;
+    integer ref_cable_a [0:9], ref_cable_b [0:9];
 
     // --- config bytes as seen on the bus (predictor) and as driven (driver) ---
-    reg [7:0] cfg_byte       [0:6];
-    reg [7:0] cfg_drive_byte [0:6];
+    reg [7:0] cfg_byte       [0:22];
+    reg [7:0] cfg_drive_byte [0:22];
     reg [23:0] dec_word;
 
     // --- expected-transaction FIFO ---
@@ -158,15 +158,13 @@ module tb_enigma;
     integer q_pos1   [0:FIFO_DEPTH-1];
     integer q_pos2   [0:FIFO_DEPTH-1];
     integer q_pos3   [0:FIFO_DEPTH-1];
-    integer q_cable1_a [0:FIFO_DEPTH-1];
-    integer q_cable1_b [0:FIFO_DEPTH-1];
-    integer q_cable2_a [0:FIFO_DEPTH-1];
-    integer q_cable2_b [0:FIFO_DEPTH-1];
+    integer q_cable_a [0:FIFO_DEPTH-1][0:9];
+    integer q_cable_b [0:FIFO_DEPTH-1][0:9];
     integer q_is_random [0:FIFO_DEPTH-1];
     integer q_random_txn [0:FIFO_DEPTH-1];
     integer fifo_head, fifo_tail, fifo_count;
     integer snap_rotor1, snap_rotor2, snap_rotor3, snap_pos1, snap_pos2, snap_pos3;
-    integer snap_cable1_a, snap_cable1_b, snap_cable2_a, snap_cable2_b;
+    integer snap_cable_a [0:9], snap_cable_b [0:9];
 
     // --- protocol predictor state ---
     reg     predictor_armed;
@@ -383,46 +381,59 @@ module tb_enigma;
     task automatic ref_set_plugboard(input integer a1, input integer b1, input integer a2, input integer b2);
         integer i;
         begin
+            ref_cable_a[0]=a1; ref_cable_b[0]=b1;
+            ref_cable_a[1]=a2; ref_cable_b[1]=b2;
             for (i = 0; i < 26; i = i + 1) ref_plug_map[i] = i;
-            ref_cable1_a = a1; ref_cable1_b = b1; ref_cable2_a = a2; ref_cable2_b = b2;
-            if (a1 >= 0 && a1 <= 25 && b1 >= 0 && b1 <= 25 && a1 != b1) begin
-                ref_plug_map[a1] = b1;
-                ref_plug_map[b1] = a1;
-            end
-            if (a2 >= 0 && a2 <= 25 && b2 >= 0 && b2 <= 25 && a2 != b2) begin
-                ref_plug_map[a2] = b2;
-                ref_plug_map[b2] = a2;
+            for (i = 0; i < 10; i = i + 1) begin
+                if (ref_cable_a[i] >= 0 && ref_cable_a[i] <= 25 &&
+                    ref_cable_b[i] >= 0 && ref_cable_b[i] <= 25 &&
+                    ref_cable_a[i] != ref_cable_b[i]) begin
+                    ref_plug_map[ref_cable_a[i]] = ref_cable_b[i];
+                    ref_plug_map[ref_cable_b[i]] = ref_cable_a[i];
+                end
             end
         end
     endtask
 
-    // Set the whole model configuration at once (inputs already decoded/legal).
     task automatic ref_set_config(input integer s1, input integer s2, input integer s3,
                                   input integer p1, input integer p2, input integer p3,
                                   input integer a1, input integer b1, input integer a2, input integer b2);
+        integer i;
         begin
             ref_rotor_slot1 = s1; ref_rotor_slot2 = s2; ref_rotor_slot3 = s3;
             ref_pos1 = p1; ref_pos2 = p2; ref_pos3 = p3;
-            ref_set_plugboard(a1, b1, a2, b2);
+            for (i = 0; i < 10; i = i + 1) begin
+                ref_cable_a[i] = NO_CABLE; ref_cable_b[i] = NO_CABLE;
+            end
+            ref_cable_a[0]=a1; ref_cable_b[0]=b1;
+            ref_cable_a[1]=a2; ref_cable_b[1]=b2;
+            ref_set_plugboard(a1,b1,a2,b2);
         end
     endtask
 
-    // Decode the 7 bytes captured from the bus (layout from the RTL header):
-    //   config word = {byte2, byte1, byte0}
-    //   [2:0] slot1 [5:3] slot2 [8:6] slot3 [13:9] pos1 [18:14] pos2 [23:19] pos3
-    //   byte3..6 [4:0] = plug cable1 A, cable1 B, cable2 A, cable2 B
+    // Decode all 23 configuration bytes (3 rotor + 20 plugboard endpoints).
     task automatic ref_apply_config_bytes;
-        reg [7:0] b3, b4, b5, b6;
+        integer i;
         begin
             dec_word = {cfg_byte[2], cfg_byte[1], cfg_byte[0]};
-            b3 = cfg_byte[3]; b4 = cfg_byte[4]; b5 = cfg_byte[5]; b6 = cfg_byte[6];
-            ref_set_config(ref_decode_rotor_select(dec_word[2:0]),
-                           ref_decode_rotor_select(dec_word[5:3]),
-                           ref_decode_rotor_select(dec_word[8:6]),
-                           ref_decode_position(dec_word[13:9]),
-                           ref_decode_position(dec_word[18:14]),
-                           ref_decode_position(dec_word[23:19]),
-                           b3[4:0], b4[4:0], b5[4:0], b6[4:0]);
+            ref_rotor_slot1 = ref_decode_rotor_select(dec_word[2:0]);
+            ref_rotor_slot2 = ref_decode_rotor_select(dec_word[5:3]);
+            ref_rotor_slot3 = ref_decode_rotor_select(dec_word[8:6]);
+            ref_pos1 = ref_decode_position(dec_word[13:9]);
+            ref_pos2 = ref_decode_position(dec_word[18:14]);
+            ref_pos3 = ref_decode_position(dec_word[23:19]);
+            for (i=0; i<10; i=i+1) begin
+                ref_cable_a[i] = cfg_byte[3+2*i][4:0];
+                ref_cable_b[i] = cfg_byte[4+2*i][4:0];
+            end
+            for (i=0; i<26; i=i+1) ref_plug_map[i]=i;
+            for (i=0; i<10; i=i+1)
+                if (ref_cable_a[i]<26 && ref_cable_b[i]<26 &&
+                    ref_cable_a[i]>=0 && ref_cable_b[i]>=0 &&
+                    ref_cable_a[i]!=ref_cable_b[i]) begin
+                    ref_plug_map[ref_cable_a[i]]=ref_cable_b[i];
+                    ref_plug_map[ref_cable_b[i]]=ref_cable_a[i];
+                end
         end
     endtask
 
@@ -480,8 +491,9 @@ module tb_enigma;
         begin
             snap_rotor1 = ref_rotor_slot1; snap_rotor2 = ref_rotor_slot2; snap_rotor3 = ref_rotor_slot3;
             snap_pos1 = ref_pos1; snap_pos2 = ref_pos2; snap_pos3 = ref_pos3;
-            snap_cable1_a = ref_cable1_a; snap_cable1_b = ref_cable1_b;
-            snap_cable2_a = ref_cable2_a; snap_cable2_b = ref_cable2_b;
+            for (integer si=0; si<10; si=si+1) begin
+                snap_cable_a[si]=ref_cable_a[si]; snap_cable_b[si]=ref_cable_b[si];
+            end
         end
     endtask
 
@@ -496,8 +508,10 @@ module tb_enigma;
                 q_is_echo[fifo_tail] = is_echo;       q_visible[fifo_tail] = visible;
                 q_rotor1[fifo_tail] = snap_rotor1;    q_rotor2[fifo_tail] = snap_rotor2;  q_rotor3[fifo_tail] = snap_rotor3;
                 q_pos1[fifo_tail] = snap_pos1;        q_pos2[fifo_tail] = snap_pos2;      q_pos3[fifo_tail] = snap_pos3;
-                q_cable1_a[fifo_tail] = snap_cable1_a; q_cable1_b[fifo_tail] = snap_cable1_b;
-                q_cable2_a[fifo_tail] = snap_cable2_a; q_cable2_b[fifo_tail] = snap_cable2_b;
+                for (integer qi=0; qi<10; qi=qi+1) begin
+                    q_cable_a[fifo_tail][qi]=snap_cable_a[qi];
+                    q_cable_b[fifo_tail][qi]=snap_cable_b[qi];
+                end
                 q_is_random[fifo_tail] = random_phase_active;
                 q_random_txn[fifo_tail] = pred_request_txn;
                 fifo_tail  = (fifo_tail + 1) % FIFO_DEPTH;
@@ -523,8 +537,8 @@ module tb_enigma;
                          q_rotor1[slot], q_rotor2[slot], q_rotor3[slot]);
                 $display("        positions : slot1=%0d slot2=%0d slot3=%0d  (before this key press)",
                          q_pos1[slot], q_pos2[slot], q_pos3[slot]);
-                $display("        plugboard : cable1=(%0d,%0d) cable2=(%0d,%0d)  (26..31 = unused)",
-                         q_cable1_a[slot], q_cable1_b[slot], q_cable2_a[slot], q_cable2_b[slot]);
+                $display("        plugboard : 10 cable pairs recorded (26..31 = unused)");
+
                 if (q_is_random[slot] != 0)
                     $display("        random    : seed=%0d random_test_number=%0d  (re-run with +SEED=%0d)",
                              random_seed_value, q_random_txn[slot], random_seed_value);
@@ -565,7 +579,7 @@ module tb_enigma;
                 end
             end
 
-            // (2) capture configuration bytes from the bus (R0..R6), decode at R7
+            // (2) capture configuration bytes from the bus (R0..R22), decode at R23
             if (pred_cfg_edge_index < CONFIG_BYTE_COUNT) cfg_byte[pred_cfg_edge_index] = uio_in;
             if (pred_cfg_edge_index == CONFIG_BYTE_COUNT) ref_apply_config_bytes;
             pred_config_ready = (pred_cfg_edge_index >= CONFIG_FIRST_GO_EDGE);
@@ -726,7 +740,7 @@ module tb_enigma;
         end
     endtask
 
-    // Fill cfg_drive_byte[0..6] from human-readable fields.
+    // Fill cfg_drive_byte[0..22] from human-readable fields.
     // Byte layout (matches the RTL header):
     //   byte0 = {slot3[1:0], slot2[2:0], slot1[2:0]}
     //   byte1 = {pos2[1:0],  pos1[4:0],  slot3[2]}
@@ -749,6 +763,10 @@ module tb_enigma;
             cfg_drive_byte[0] = word[7:0];
             cfg_drive_byte[1] = word[15:8];
             cfg_drive_byte[2] = word[23:16];
+            for (integer ci=0; ci<10; ci=ci+1) begin
+                cfg_drive_byte[3+2*ci] = {plug_byte_junk_bits, 5'd31};
+                cfg_drive_byte[4+2*ci] = {plug_byte_junk_bits, 5'd31};
+            end
             letter5 = plug1_a; cfg_drive_byte[3] = {plug_byte_junk_bits, letter5};
             letter5 = plug1_b; cfg_drive_byte[4] = {plug_byte_junk_bits, letter5};
             letter5 = plug2_a; cfg_drive_byte[5] = {plug_byte_junk_bits, letter5};
@@ -757,7 +775,7 @@ module tb_enigma;
     endtask
 
     // Drive the bus for 'num_edges' consecutive edges starting at R0:
-    // edge i carries cfg_drive_byte[i] for i<=6, idle afterwards.  Optionally
+    // edge i carries cfg_drive_byte[i] for i<=22, idle afterwards.  Optionally
     // pulse the strobe for exactly one cycle at edge 'strobe_edge' (-1 = never).
     // Returns just after edge number (num_edges-1) has passed.
     task automatic drive_config_edges(input integer num_edges, input integer strobe_edge, input integer strobe_letter);
@@ -1239,9 +1257,9 @@ module tb_enigma;
             start_machine(2, 1, 0, 5, 9, 13, 4, 17, 9, 22);
             encrypt_message(3);
             set_config_bytes_from_fields(0, 3, 4, 20, 1, 2, 0, 25, 1, 24);   // a different config on the bus
-            drive_config_edges(8, -1, 0);
+            drive_config_edges(CONFIG_BYTE_COUNT + 1, -1, 0);
             encrypt_message(4);
-            drive_config_edges(8, -1, 0);
+            drive_config_edges(CONFIG_BYTE_COUNT + 1, -1, 0);
             encrypt_message(4);
             end_test;
 
@@ -1460,6 +1478,23 @@ module tb_enigma;
             plug_byte_junk_bits = 3'b111;
             plugboard_scenario("junk on uio_in[7:5] of plug bytes is ignored", 4, 17, 9, 22);
             plug_byte_junk_bits = 3'b000;
+
+            begin_test("T6.7 All ten plugboard cables are checked", 0);
+            ena = 1'b1;
+            set_config_bytes_from_fields(2, 1, 0, 3, 7, 11,
+                                          0,25, 1,24);
+            cfg_drive_byte[7]  = 2;  cfg_drive_byte[8]  = 23;
+            cfg_drive_byte[9]  = 3;  cfg_drive_byte[10] = 22;
+            cfg_drive_byte[11] = 4;  cfg_drive_byte[12] = 21;
+            cfg_drive_byte[13] = 5;  cfg_drive_byte[14] = 20;
+            cfg_drive_byte[15] = 6;  cfg_drive_byte[16] = 19;
+            cfg_drive_byte[17] = 7;  cfg_drive_byte[18] = 18;
+            cfg_drive_byte[19] = 8;  cfg_drive_byte[20] = 17;
+            cfg_drive_byte[21] = 9;  cfg_drive_byte[22] = 16;
+            apply_reset(2);
+            load_configuration;
+            encrypt_alphabet;
+            end_test;
         end
     endtask
 
@@ -1750,7 +1785,7 @@ module tb_enigma;
             exp_valid = 1'b0; exp_result = 5'd0; exp_changed_this_edge = 1'b0;
             last_published_was_encrypt = 1'b0; visible_change = 1'b0;
             prev_valid = 1'b0; prev_result = 5'd0; prev_uo_out = 8'h00;
-            for (i = 0; i < 7; i = i + 1) begin cfg_byte[i] = 8'h00; cfg_drive_byte[i] = 8'h00; end
+            for (i = 0; i < 23; i = i + 1) begin cfg_byte[i] = 8'h00; cfg_drive_byte[i] = 8'h00; end
             fifo_clear;
             ref_build_tables;
             ref_set_config(0, 1, 2, 0, 0, 0, NO_CABLE, NO_CABLE, NO_CABLE, NO_CABLE);
@@ -1812,9 +1847,7 @@ module tb_enigma;
             if (overall_pass) $display("  TESTBENCH RESULT: PASS");
             else              $display("  TESTBENCH RESULT: FAIL");
             $display("------------------------------------------------------------------");
-            $display("  PASS here means 'no mismatch found by THESE tests'.  It is not a");
-            $display("  production sign-off: gate-level simulation, coverage review, X-propagation");
-            $display("  and timing sign-off are still required.");
+            $display("  PASS here means 'no mismatch found by these tests'.");
             $display("==================================================================");
         end
     endtask

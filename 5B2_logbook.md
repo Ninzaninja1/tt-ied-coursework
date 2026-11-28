@@ -67,9 +67,13 @@ Replaced rotor table to have forward and reverse in one case which creates less 
 
 To try and reduce the slew error, I am separating the rotor function into 2 sections, phase 1 is the address phase and look up phase, this should help with the clock timings as there are more buffered values. Tried multiple iterations of configuration with different buffers and settings, which ran me over the compute limit for the week. Will spend more time making the testbench check more throughly.
 
+I reintroduced the plugboard design which acts in the following order Letter -> plugboard swap -> Rotor 1 -> 2 -> 3 -> Reflector -> Inverse Rotor 3 -> 2 -> 1 -> plugboard swap -> output. As my space allows for addition implementations, I have opted to try the design with just 2 plugs to guage the utilisation before proceding with implementing the rest of the 10 pairs.
+
 # 27/11/26
 I migrated to using iverilog and github.
 
 I created points that I wanted checked in the testbench and rewrote the entire testbench to check based on the parameters mentioned in the testbench.
 
-As I am not able to check every configuration and input as this is simply too long, I will divide checking into blocks. To check the LUTS are correct I can implement this check $$R^{-1}(R(x)) = x$$ and similarly with the plugboard values $$P(P(x))= x$$ 
+As I am not able to check every configuration and input as this is simply too long, I will divide checking into blocks. To check the LUTS are correct I can implement this check $$R^{-1}(R(x)) = x$$ and similarly with the plugboard values $$P(P(x))= x$$. 
+
+After implementing the plugboard, the utilisation went to around 61% which shows that implementing the plugboard is possible in this space. I have expanded on the design to include all of the plugboard design, which includes the 10 pairs of letters. This means that we need to have 20 bytes of config as we need 5 bits per letter and each input word can only store 8 bits.

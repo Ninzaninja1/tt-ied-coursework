@@ -3,17 +3,22 @@
 //    byte 0 = {slot3_sel[1:0], slot2_sel[2:0], slot1_sel[2:0]}
 //    byte 1 = {pos2[1:0], pos1[4:0], slot3_sel[2]}
 //    byte 2 = {pos3[4:0], pos2[4:2]}
-//    byte 3 = plug cable 1, letter A   (uio_in[4:0], upper 3 bits ignored)
-//    byte 4 = plug cable 1, letter B
-//    byte 5 = plug cable 2, letter A
-//    byte 6 = plug cable 2, letter B
+//    byte 3  = plug cable 1,  letter A   (uio_in[4:0], upper 3 bits ignored)
+//    byte 4  = plug cable 1,  letter B
+//    byte 5  = plug cable 2,  letter A
+//    byte 6  = plug cable 2,  letter B
+//      ...
+//    byte 21 = plug cable 10, letter A
+//    byte 22 = plug cable 10, letter B
 //
 //    config_reg = {pos3[4:0], pos2[4:0], pos1[4:0], slot3_sel[2:0], slot2_sel[2:0], slot1_sel[2:0]}
 //    [23:19] pos3 [18:14] pos2 [13:9] pos1 [8:6] slot3_sel [5:3] slot2_sel [2:0] slot1_sel
 //
 //  slot1 = right (fast) rotor
 //
-//  Plugboard: each cable swaps two letters (A<->B and B<->A)
+//  Plugboard: up to 10 cables, each swaps two letters (A<->B and B<->A).
+//  All 20 plug bytes must always be sent. To leave a cable unused, send a
+//  letter code >= 26 (e.g. 31) for either end of it.
 // =============================================================================
 
 module tt_um_ninzaninja1_ied_coursework (
@@ -42,54 +47,58 @@ module tt_um_ninzaninja1_ied_coursework (
     wire letter_ok = (in < 5'd26);
 
     // ------------------------------------------------------------------
-    // Load config - 7 bytes (3 rotor bytes + 4 plugboard letters)
+    // Load config - 23 bytes (3 rotor bytes + 20 plugboard letters)
     // ------------------------------------------------------------------
     reg [23:0] config_reg;
-    reg [4:0]  plug1_a, plug1_b; // plugboard cable 1 connects these two letters
-    reg [4:0]  plug2_a, plug2_b; // plugboard cable 2 connects these two letters
 
-    // TODO: how to check and reject case for when A->B plug 1 and B-> C plug 2 
+    // All 10 cables in one register, 5 bits per letter:
+    //   cable i letter A = plug_reg[10*i     +: 5]
+    //   cable i letter B = plug_reg[10*i + 5 +: 5]      (i = 0 is "cable 1")
+    reg [99:0] plug_reg;
 
-    reg [2:0] config_counter;
+    reg [4:0] config_counter;
     reg config_loaded;
     reg config_done;
 
     always @(posedge clk) begin
         if (!rst_n) begin // if reset then put everything to 0
-            config_counter <= 3'd0;
+            config_counter <= 5'd0;
             config_loaded <= 1'b0;
             config_done <= 1'b0;
         end else begin
             config_done <= 1'b0;
-            // load value from uio_in 7 times (counted by config_counter, and set config_done flag to true when its complete)
+            // load value from uio_in 23 times (counted by config_counter, and set config_done flag to true when its complete)
             if (!config_loaded) begin
-                // Count 0..6 to capture the seven bytes, then use count 7 to
+                // Count 0..22 to capture the 23 bytes, then use count 23 to
                 // raise config_done one cycle LATER so config_reg is fully written to before reading
-                if (config_counter == 3'd7) begin
+                if (config_counter == 5'd23) begin
                     config_loaded <= 1'b1;
                     config_done   <= 1'b1;
                 end else begin
-                    config_counter <= config_counter + 3'd1; //increment counter
+                    config_counter <= config_counter + 5'd1; //increment counter
                 end
             end
         end
     end
 
-    always @(posedge clk) begin // load config for 7 clk cycles
+    always @(posedge clk) begin // load config for 23 clk cycles
         if (rst_n && !config_loaded) begin
             case (config_counter)
-                3'd0: config_reg[7:0]   <= uio_in;
-                3'd1: config_reg[15:8]  <= uio_in;
-                3'd2: config_reg[23:16] <= uio_in;
-                // Store the raw 5-bit code, do NOT clamp to 0. swap_pair()
-                // disables a cable when either end is >= 26, so an"unused"
-                // code must stay >= 26. Clamping it to letter A would turn a
-                // half-unused cable (e.g. {31, D}) into a live A-D swap.
-                3'd3: plug1_a <= uio_in[4:0];
-                3'd4: plug1_b <= uio_in[4:0];
-                3'd5: plug2_a <= uio_in[4:0];
-                3'd6: plug2_b <= uio_in[4:0];
-                default: ;
+                5'd0: config_reg[7:0]   <= uio_in;
+                5'd1: config_reg[15:8]  <= uio_in;
+                5'd2: config_reg[23:16] <= uio_in;
+                default: begin
+                    // Counts 3..22 are the 20 plug letters. Each one is shifted
+                    // in at the top, so after 20 bytes the FIRST byte sits in
+                    // plug_reg[4:0] (cable 1, letter A) and the LAST byte in
+                    // plug_reg[99:95] (cable 10, letter B).
+                    // Store the raw 5-bit code, do NOT clamp to 0. swap_pair()
+                    // disables a cable when either end is >= 26, so an "unused"
+                    // code must stay >= 26. Clamping it to letter A would turn a
+                    // half-unused cable (e.g. {31, D}) into a live A-D swap.
+                    if (config_counter < 5'd23)
+                        plug_reg <= {uio_in[4:0], plug_reg[99:5]};
+                end
             endcase
         end
     end
@@ -135,7 +144,7 @@ module tt_um_ninzaninja1_ied_coursework (
     // ------------------------------------------------------------------
     // Plugboard
     // ------------------------------------------------------------------
-    function [4:0] swap_pair;
+    function [4:0] swap_pair; // one cable
         input [4:0] x; // letter going through the plugboard
         input [4:0] a; // one end of the cable
         input [4:0] b; // other end of the cable
@@ -151,17 +160,22 @@ module tt_um_ninzaninja1_ied_coursework (
         end
     endfunction
 
-    function [4:0] plugboard;
-        input [4:0] x;
-        input [4:0] p1a, p1b; // cable 1
-        input [4:0] p2a, p2b; // cable 2
+    function [4:0] plugboard; // all 10 cables
+        input [4:0]  x;
+        input [99:0] plugs;   // same layout as plug_reg
+        integer     i;
         reg   [4:0] y;
+        reg         matched;
         begin
-            y = swap_pair(x, p1a, p1b); // try cable 1
-            if (y != x)
-                plugboard = y;          // cable 1 matched
-            else
-                plugboard = swap_pair(x, p2a, p2b); // otherwise try cable 2
+            plugboard = x;    // no cable touches this letter: pass straight through
+            matched   = 1'b0;
+            for (i = 0; i < 10; i = i + 1) begin
+                y = swap_pair(x, plugs[10*i +: 5], plugs[10*i + 5 +: 5]); // try cable i+1
+                if (!matched && y != x) begin // first cable that matches wins
+                    plugboard = y;
+                    matched   = 1'b1;
+                end
+            end
         end
     endfunction
 
@@ -233,6 +247,7 @@ module tt_um_ninzaninja1_ied_coursework (
                 curr_pos  = pos1;
             end
 
+            // cnt 7 is the plugboard output stage: the rotor datapath is not used
             default: begin
                 curr_segment = 2'd0;
                 curr_sel  = slot1_sel;
@@ -261,8 +276,12 @@ module tt_um_ninzaninja1_ied_coursework (
     end
 
     // plugboard is at both ends of the machine
-    wire [4:0] plug_in  = plugboard(in,        plug1_a, plug1_b, plug2_a, plug2_b);
-    wire [4:0] plug_out = plugboard(stage_out, plug1_a, plug1_b, plug2_a, plug2_b);
+    //   plug_in  : keyboard letter -> plugboard -> mid (start of rotor stages)
+    //   plug_out : mid (after the last rotor stage) -> plugboard -> result
+    // plug_out reads mid, not stage_out, so it gets its own clock cycle (cnt 7)
+    // instead of being chained after the rotor LUTs.
+    wire [4:0] plug_in  = plugboard(in,  plug_reg);
+    wire [4:0] plug_out = plugboard(mid, plug_reg);
 
     // ------------------------------------------------------------------
     // Rotor stepping
@@ -302,9 +321,9 @@ module tt_um_ninzaninja1_ied_coursework (
                     end
                 end
                 ROT: begin
-                    if (cnt == 3'd6) begin
+                    if (cnt == 3'd7) begin // cnt 0..6 rotor stages, cnt 7 plugboard out
                         cnt    <= 3'd0;
-                        result <= plug_out; // was stage_out: now through the plugboard
+                        result <= plug_out;
                         valid  <= 1'b1;
                         state  <= IDLE;
                     end else begin
